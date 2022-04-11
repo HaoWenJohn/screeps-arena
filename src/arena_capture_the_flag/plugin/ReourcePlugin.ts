@@ -2,7 +2,7 @@ import { getObjectsByPrototype } from "game/utils";
 import { Flag } from "arena/prototypes";
 import { Creep, StructureTower } from "game/prototypes";
 import { ATTACK, HEAL, RANGED_ATTACK } from "game/constants";
-import { CTX, Plugin } from "../common";
+import { CTX, Plugin } from "..";
 
 export const resource_plugin=function(){
   return {
@@ -10,6 +10,7 @@ export const resource_plugin=function(){
     init: (ctx: CTX) => {
       ctx.my_flag = getObjectsByPrototype(Flag).filter(flag => flag.my)[0];
       ctx.enemy_flag = getObjectsByPrototype(Flag).filter(flag => !flag.my)[0];
+      ctx.my_creeps = my_creeps();
     },
 
 

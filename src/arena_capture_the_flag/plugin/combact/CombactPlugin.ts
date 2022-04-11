@@ -1,4 +1,4 @@
-import { CTX } from "../../common";
+import { CTX } from "../..";
 import { move_plugin } from "./MovePlugin";
 import { attack_plugin } from "./AttackPlugin";
 import { heal_plugin } from "./HealPlugin";

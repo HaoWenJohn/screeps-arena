@@ -1,4 +1,4 @@
-import { CTX, Plugin } from "../../common";
+import { CTX, Plugin } from "../..";
 
 export const move_plugin=
    {

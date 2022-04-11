@@ -1,10 +1,10 @@
 import { Creep, RoomPosition, StructureTower } from "game/prototypes";
 import { ErrorMapper } from "../utils/ErrorMapper";
 import { combact_plugin } from "./plugin/combact/CombactPlugin";
-import { CTX, Plugin } from "./common";
+import { CTX, Plugin } from ".";
 import { resource_plugin } from "./plugin/ReourcePlugin";
 import { situation_plugin } from "./plugin/SituationPlugin";
-import { target_plugin } from "./plugin/TargetPlugin";
+
 import { group_plugin } from "./plugin/GroupPlugin";
 import { DirectionConstant } from "game/constants";
 
@@ -16,8 +16,9 @@ declare module "game/prototypes" {
     initialPos: RoomPosition;
     group: number,
     role: string,
-    move_target?: RoomPosition
-    next_move_pos:RoomPosition|null
+    move_target?: RoomPosition,
+    next_move_pos:RoomPosition|null,
+
   }
 }
 

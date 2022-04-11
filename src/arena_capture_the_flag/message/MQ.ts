@@ -1,0 +1,46 @@
+import { MQ, Msg, MsgBody, MsgType, Subscriber } from "MQ";
+interface MsgPair {
+  type:MsgType,
+  body:MsgBody
+}
+export class SimpleMQ implements MQ{
+
+  register_list:{[key:string]:((msg:Msg)=>void)[]};
+  current_message_queue:{[key:string]:Msg[]};
+  next_message_queue:{[key:string]:Msg[]};
+  constructor() {
+    this.register_list = {};
+    this.current_message_queue={};
+    this.next_message_queue={};
+  }
+
+  publish(topic:string,msg: Msg): void {
+    if (!this.next_message_queue[topic]) {
+      this.next_message_queue[topic]=[];
+    }
+    this.next_message_queue[topic].push(msg);
+  }
+
+  register(topic:string,subscriber: Subscriber): void {
+
+    if (!this.register_list[topic]){
+      this.register_list[topic]=[];
+    }
+    this.register_list[topic].push(subscriber.on_message)
+
+  }
+
+  run(): void {
+    for (let topic in this.current_message_queue){
+      let messages = this.current_message_queue[topic];
+      for (let on_message of this.register_list[topic]){
+        messages.forEach(message=>on_message(message))
+      }
+    }
+
+    this.current_message_queue = this.next_message_queue;
+    this.next_message_queue = {};
+  }
+
+
+}

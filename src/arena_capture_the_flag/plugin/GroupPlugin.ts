@@ -1,10 +1,10 @@
 import { Creep, RoomPosition } from "game/prototypes";
-import { CTX, Situation } from "../common";
+import { CTX, Situation } from "..";
 import { findClosestByPath, getObjectsByPrototype, getTerrainAt } from "game/utils";
 import { BodyPart } from "arena/prototypes";
 import { ATTACK, HEAL, RANGED_ATTACK, TERRAIN_WALL } from "game/constants";
 import { searchPath } from "game/path-finder";
-
+import {circle} from "game/visual"
 
 interface Group {
   merge(other: Group): Group
@@ -46,11 +46,18 @@ class SimpleGroup implements Group {
   }
 
   elect(): Creep | null {
+
     this.members.tanks = this.members.tanks.filter(creep => creep.exists);
     this.members.archers = this.members.archers.filter(creep => creep.exists);
     this.members.healers = this.members.healers.filter(creep => creep.exists);
-    if (this.members.tanks.length > 0) return this.members.tanks[0];
-    else if (this.members.archers.length > 0) return this.members.archers[0];
+    if (this.members.tanks.length > 0)
+
+      return this.members.tanks[0];
+
+    else if (this.members.archers.length > 0)
+
+      return this.members.archers[0];
+
     //merge to other group
     else return null;
   }
@@ -65,10 +72,17 @@ class SimpleGroup implements Group {
   run(ctx: CTX): void {
 
     if (!this.leader?.exists) {
+      console.log("leader no exists!");
       this.leader = this.elect();
-      if (!this.leader) return;
+
+      if (!this.leader) {
+        console.log("cannot elect new leader!");
+        return;
+      }
+      console.log(` elect a new leader:${this.leader}`);
     }
 
+    circle(this.leader!, { radius: 0.5 });
     if (!ctx.situation) return;
     let target;
     switch (ctx.situation) {
@@ -100,7 +114,7 @@ class SimpleGroup implements Group {
   }
 
   group_move(leader:Creep){
-    let current_members = this.all()
+    let current_members = this.all();
     let formation_idx = 0;
     for (let idx in current_members){
       let creep = current_members[idx];
@@ -153,7 +167,7 @@ export const group_plugin = (
       }
     }
   }()
-)
+);
 
 
 

@@ -1,8 +1,36 @@
 import { findInRange, findPath, getObjectsByPrototype } from "game/utils";
-import { CTX, Plugin } from "../../common";
-import { Creep } from "game/prototypes";
-
+import { CTX, Plugin } from "../..";
+import { Creep ,StructureTower} from "game/prototypes";
 import { attackable, ranged_attackable } from "./common";
+import { Msg, MsgType } from "MQ";
+
+
+declare module "MQ"{
+  enum MsgType{
+    attack="attack"
+  }
+  interface MsgBody {
+
+    "attack":{
+      id:string
+    }
+  }
+
+
+}
+declare module "MQ"{
+  enum MsgType{
+    heal="heal"
+  }
+  interface MsgBody {
+
+    "heal":{
+      pos:string
+    }
+  }
+
+
+}
 
 export const attack_plugin=
    {

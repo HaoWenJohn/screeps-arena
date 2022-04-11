@@ -2,7 +2,7 @@ import { findClosestByPath, findPath, getObjectsByPrototype, getTicks } from "ga
 import { Creep } from "game/prototypes";
 import { circle, text } from "game/visual";
 
-import { CTX, Situation } from "../common";
+import { CTX, Situation } from "..";
 
 
 export const situation_plugin =

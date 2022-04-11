@@ -1,6 +1,7 @@
 import { findInRange } from "game/utils";
-import { CTX, Plugin } from "../../common";
+import { CTX, Plugin } from "../..";
 import { healable } from "./common";
+
 
 export const heal_plugin=
    {
