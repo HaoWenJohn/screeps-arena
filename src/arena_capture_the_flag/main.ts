@@ -1,15 +1,19 @@
-import { Creep } from "game/prototypes";
-import { findClosestByPath, findInRange, getObjectsByPrototype } from "game/utils";
+import { Creep, RoomPosition, StructureTower } from "game/prototypes";
+import { findClosestByPath, findInRange, findPath, getObjectsByPrototype, getTicks } from "game/utils";
 import { ATTACK, BodyPartConstant, HEAL, MOVE, RANGED_ATTACK } from "game/constants";
 import { BodyPart, Flag } from "arena/prototypes";
-import {visual} from "game";
+import { circle, line, text } from "game/visual";
+import { ErrorMapper } from "../utils/ErrorMapper";
+
+
+
 
 declare module "game/prototypes" {
   interface Creep {
     initialPos: RoomPosition;
     group: number,
     role: string,
-    move_target?:RoomPosition
+    move_target?: RoomPosition
   }
 }
 
@@ -19,28 +23,58 @@ interface Plugin {
   run: (ctx: CTX) => void,
 }
 
-let plugin_list: (() => Plugin)[] = [
-  resource_plugin, heal_plugin, attack_plugin,target_plugin,move_plugin
+let plugin_list: Plugin[] = [
+  resource_plugin(), heal_plugin(), attack_plugin(), situation_plugin(), target_plugin(), move_plugin()
 ];
+
+enum Situation {
+  ATTACK = "ATTACK",
+  PICK = "PICK",
+  BLOCK = "BLOCK",
+  DEFENSE = "DEFENSE"
+}
 
 interface CTX {
   my_creeps?: Creep[],
   hero0?: Creep,
-  hero1?: Creep
+  hero1?: Creep,
+  my_flag?: Flag,
+  enemy_flag?: Flag,
+  situation?: Situation,
+  nearest_enemy?: Creep,
+  tower?: StructureTower[]
 }
 
 let ctx: CTX = {};
 
-plugin_list.forEach(plugin => plugin().init(ctx));
 
+
+let need_initial = true;
 export function loop() {
-  plugin_list.forEach(plugin => plugin().run(ctx));
+  ErrorMapper.wrapLoop(
+    ()=>{
+      if (need_initial){
+        plugin_list.forEach(plugin => {
+
+          plugin.init(ctx)
+        });
+        need_initial=false;
+      }
+      plugin_list.forEach(plugin => {
+        console.log(`-----${plugin.name}----\n`);
+        plugin.run(ctx);
+      });
+    })();
+
 }
 
 function resource_plugin(): Plugin {
   return {
     name: "resource_plugin",
     init: (ctx: CTX) => {
+      ctx.my_flag = getObjectsByPrototype(Flag).filter(flag => flag.my)[0];
+      console.log(ctx.my_flag)
+      ctx.enemy_flag = getObjectsByPrototype(Flag).filter(flag => !flag.my)[0];
     },
 
 
@@ -73,10 +107,53 @@ function resource_plugin(): Plugin {
       }
       ctx.hero0 = heros[0];
       ctx.hero1 = heros[1];
+      ctx.tower = getObjectsByPrototype(StructureTower).filter(tower => tower.my);
     }
   };
 }
 
+function situation_plugin(): Plugin {
+  return {
+    init(ctx: CTX): void {
+
+    },
+    name: "situation_plugin",
+    run(ctx: CTX): void {
+      if (getTicks() > 1500) {
+        ctx.situation = Situation.ATTACK;
+        return;
+      }
+      let nearest_enemy = findClosestByPath(ctx.my_flag!, getObjectsByPrototype(Creep).filter(creep => !creep.my));
+
+      if (nearest_enemy) {
+
+        ctx.nearest_enemy = nearest_enemy;
+
+
+
+        circle(ctx.nearest_enemy,{radius:0.5});
+
+        let dis = findPath(ctx.my_flag!, ctx.nearest_enemy).length;
+
+        if (dis > 70) {
+
+          ctx.situation = Situation.PICK;
+
+        } else if (dis >50 && dis <= 70) {
+          ctx.situation = Situation.BLOCK;
+        } else {
+          ctx.situation = Situation.DEFENSE;
+        }
+
+        text(`${ctx.situation}`,{x:50,y:50})
+
+      }
+
+
+    }
+
+  };
+}
 
 function heal_plugin(): Plugin {
   return {
@@ -129,6 +206,10 @@ function attack_plugin(): Plugin {
 
       });
 
+      if (ctx.tower&&ctx.nearest_enemy&&findPath(ctx.tower[0],ctx.nearest_enemy).length<8) {
+          ctx.tower.forEach(tower => tower.attack(ctx.nearest_enemy!));
+      }
+
     }
   };
 }
@@ -143,23 +224,42 @@ function target_plugin(): Plugin {
 
 
     run: (ctx: CTX) => {
-      if (ctx.hero0){
-        ctx.hero0.move_target = getObjectsByPrototype(Flag).filter(flag => flag.my)[0];
 
+
+      switch (ctx.situation) {
+        case Situation.ATTACK:
+          if (ctx.hero1) {
+            ctx.hero1.move_target = ctx.enemy_flag;
+          }
+          if (ctx.hero0) {
+            ctx.hero0.move_target = ctx.enemy_flag;
+          }
+          break;
+        case Situation.BLOCK:
+          if (ctx.hero1) {
+            ctx.hero1.move_target = ctx.nearest_enemy;
+          }
+          if (ctx.hero0) {
+            ctx.hero0.move_target = ctx.nearest_enemy;
+          }
+          break;
+        case Situation.DEFENSE:
+          if (ctx.hero1) {
+            ctx.hero1.move_target = ctx.nearest_enemy;
+          }
+          if (ctx.hero0) {
+            ctx.hero0.move_target = ctx.my_flag;
+          }
+          break;
+        case Situation.PICK:
+          let body_parts = findInRange(ctx.my_flag!, getObjectsByPrototype(BodyPart), 80);
+          if (body_parts.length > 0) ctx.hero0!.move_target = body_parts[0];
+          if (body_parts.length > 1) ctx.hero1!.move_target = body_parts[1];
+          break;
       }
-      if (ctx.hero1){
-        let pickable_body_part = findClosestByPath(ctx.hero1, getObjectsByPrototype(BodyPart));
-        if (pickable_body_part) {
-          ctx.hero1.move_target = pickable_body_part;
-        }
-        if (ctx.hero1.move_target)
-          visual.line(ctx.hero1, ctx.hero1.move_target);
-      }
 
-
-
-
-
+      if (ctx.hero1)line(ctx.hero1,ctx.hero1.move_target!);
+      if (ctx.hero0)line(ctx.hero0,ctx.hero0.move_target!);
       let other_creeps = ctx.my_creeps!.filter(creep => creep.role !== "hero");
 
       other_creeps.forEach(creep => creep.move_target = creep.group === 0 ? ctx.hero0 : ctx.hero1);
@@ -170,20 +270,22 @@ function target_plugin(): Plugin {
 
 //
 //
-function move_plugin():Plugin {return {
-  name: "move_plugin",
-  init: (ctx:CTX) => {
+function move_plugin(): Plugin {
+  return {
+    name: "move_plugin",
+    init: (ctx: CTX) => {
 
-  },
-
-
-
-  run: (ctx:CTX) => {
-    ctx.my_creeps!.forEach(creep=>creep.moveTo(creep.move_target!))
-  },
+    },
 
 
-}}
+    run: (ctx: CTX) => {
+      ctx.my_creeps!.forEach(creep => creep.moveTo(creep.move_target!));
+    }
+
+
+  };
+}
+
 //
 function workable(creep: Creep, BODY_PART: BodyPartConstant) {
   return creep.body.some(body_part => body_part.type == BODY_PART && body_part.hits >= 0);
