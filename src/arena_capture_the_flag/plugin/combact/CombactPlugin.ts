@@ -1,7 +1,8 @@
-import { CTX } from "../..";
+
 import { move_plugin } from "./MovePlugin";
 import { attack_plugin } from "./AttackPlugin";
 import { heal_plugin } from "./HealPlugin";
+import { CTX } from "../../common";
 
 export const combact_plugin = (function(){
 

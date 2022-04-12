@@ -1,9 +1,7 @@
-import { MQ, Msg, MsgBody, MsgType, Subscriber } from "MQ";
-interface MsgPair {
-  type:MsgType,
-  body:MsgBody
-}
-export class SimpleMQ implements MQ{
+import { Msg, MsgBody, Subscriber } from "./common";
+
+
+class SimpleMQ {
 
   register_list:{[key:string]:((msg:Msg)=>void)[]};
   current_message_queue:{[key:string]:Msg[]};
@@ -14,11 +12,13 @@ export class SimpleMQ implements MQ{
     this.next_message_queue={};
   }
 
-  publish(topic:string,msg: Msg): void {
+  publish(topic:string,msg_type:string,msg: MsgBody): void {
     if (!this.next_message_queue[topic]) {
       this.next_message_queue[topic]=[];
     }
-    this.next_message_queue[topic].push(msg);
+
+
+    this.next_message_queue[topic].push({type:msg_type,body:msg});
   }
 
   register(topic:string,subscriber: Subscriber): void {
@@ -44,3 +44,4 @@ export class SimpleMQ implements MQ{
 
 
 }
+export let smq = new SimpleMQ();

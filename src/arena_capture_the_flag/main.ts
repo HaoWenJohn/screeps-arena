@@ -1,12 +1,15 @@
 import { Creep, RoomPosition, StructureTower } from "game/prototypes";
 import { ErrorMapper } from "../utils/ErrorMapper";
 import { combact_plugin } from "./plugin/combact/CombactPlugin";
-import { CTX, Plugin } from ".";
+
 import { resource_plugin } from "./plugin/ReourcePlugin";
 import { situation_plugin } from "./plugin/SituationPlugin";
 
 import { group_plugin } from "./plugin/GroupPlugin";
 import { DirectionConstant } from "game/constants";
+import { smq } from "./message/MQ";
+import { CTX, Plugin } from "./common";
+
 
 
 
@@ -18,7 +21,9 @@ declare module "game/prototypes" {
     role: string,
     move_target?: RoomPosition,
     next_move_pos:RoomPosition|null,
-
+    concentrate_attack:Creep|StructureTower
+    concentrate_heal:Creep,
+    leader:boolean
   }
 }
 
@@ -29,8 +34,11 @@ let plugin_list: Plugin[] = [
 
 let ctx: CTX = { my_creeps: [], enemy_flag: null, nearest_enemy: null };
 let need_initial = true;
-export const loop= ErrorMapper.wrapLoop(
+
+
+export const loop= //ErrorMapper.wrapLoop(
     ()=>{
+      //-------init----------
       if (need_initial){
         plugin_list.forEach(plugin => {
 
@@ -38,11 +46,15 @@ export const loop= ErrorMapper.wrapLoop(
         });
         need_initial=false;
       }
+
+      //-----run-----------
+      smq.run()
+
       plugin_list.forEach(plugin => {
         console.log(`-----${plugin.name}----\n`);
         plugin.run(ctx);
       });
-    })
+    }//)
 
 
 

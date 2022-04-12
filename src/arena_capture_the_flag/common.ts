@@ -1,4 +1,3 @@
-
 import { Creep, StructureTower } from "game/prototypes";
 import { Flag } from "arena/prototypes";
 
@@ -7,13 +6,13 @@ export interface Plugin {
   init: (ctx: CTX) => void,
   run: (ctx: CTX) => void,
 }
-export enum Situation {
+ export enum Situation {
   ATTACK = "ATTACK",
   PICK = "PICK",
   BLOCK = "BLOCK",
   DEFENSE = "DEFENSE"
 }
-export interface CTX {
+ export interface CTX {
   my_creeps: Creep[],
   hero0?: Creep,
   hero1?: Creep,

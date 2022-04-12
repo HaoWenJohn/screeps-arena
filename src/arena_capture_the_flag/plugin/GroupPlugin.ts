@@ -1,10 +1,20 @@
 import { Creep, RoomPosition } from "game/prototypes";
-import { CTX, Situation } from "..";
-import { findClosestByPath, getObjectsByPrototype, getTerrainAt } from "game/utils";
+
+import { findClosestByPath, findInRange, findPath, getObjectsByPrototype, getTerrainAt } from "game/utils";
 import { BodyPart } from "arena/prototypes";
 import { ATTACK, HEAL, RANGED_ATTACK, TERRAIN_WALL } from "game/constants";
 import { searchPath } from "game/path-finder";
-import {circle} from "game/visual"
+
+import { smq } from "../message/MQ";
+
+import { CTX, Situation } from "../common";
+import { Msg, MsgType } from "../message/common";
+import { MESSAGE_TYPE_SITUATION } from "./SituationPlugin";
+import { guid } from "../../utils/uuid";
+import { create } from "domain";
+
+// @ts-ignore
+import {Visual} from "game/visual";
 
 interface Group {
   merge(other: Group): Group
@@ -31,6 +41,7 @@ class SimpleGroup implements Group {
   members: SimpleGroupMember;
   leader: Creep | null;
   task: TargetDescriptor;
+  id:string;
 
   constructor(members: SimpleGroupMember) {
     this.members = members;
@@ -39,6 +50,12 @@ class SimpleGroup implements Group {
       situation: Situation.PICK,
       target: null
     };
+    this.id = guid();
+
+    smq.register("situation",{on_message:(msg:Msg)=>{
+
+
+      }})
   }
 
   all(): Creep[] {
@@ -79,21 +96,44 @@ class SimpleGroup implements Group {
         console.log("cannot elect new leader!");
         return;
       }
+      this.leader.leader=true;
+
       console.log(` elect a new leader:${this.leader}`);
     }
 
-    circle(this.leader!, { radius: 0.5 });
+    let combact;
+    let sorted_ranged_hits_enemys = findInRange(this.leader,getObjectsByPrototype(Creep).filter(creep=>!creep.my),3).sort((c1,c2)=>c1.hits/c1.hitsMax-c2.hits/c2.hitsMax);
+
+    if (sorted_ranged_hits_enemys.length>0){
+      new Visual().line(this.leader,sorted_ranged_hits_enemys[0], {color: '#ff0000'});
+
+      this.all().forEach(creep=>creep.concentrate_attack= sorted_ranged_hits_enemys[0]);
+     combact = true;
+    }else combact=false;
+
+
+
+
+
+    let sorted_ranged_hits_creeps = this.all().sort((c1,c2)=>c1.hits/c1.hitsMax-c2.hits/c2.hitsMax);
+    if (sorted_ranged_hits_creeps.length>0)this.all().forEach(creep=>creep.concentrate_heal= sorted_ranged_hits_creeps[0])
+
+
+
+
     if (!ctx.situation) return;
     let target;
     switch (ctx.situation) {
       case Situation.PICK:
+
         let body_parts = getObjectsByPrototype(BodyPart);
 
         if (body_parts.length > 0) {
-          target = findClosestByPath(this.leader, body_parts);
+          target = findClosestByPath(this.leader, body_parts,{ignore:this.all()});
 
         }else {
           target = null
+
         }
         break;
       case Situation.DEFENSE:
@@ -107,8 +147,20 @@ class SimpleGroup implements Group {
         target = ctx.enemy_flag;
 
     }
+    if (combact){
+      let search = findPath(this.leader,sorted_ranged_hits_enemys[0],{ignore:this.all()})
+      if (search.length>0){
+        this.leader.next_move_pos =search[0]
+      }
 
-    this.leader.next_move_pos = this.next_step(target);
+    }else{
+
+      this.leader.next_move_pos = this.next_step(target);
+
+
+    }
+
+
     this.group_move(this.leader)
 
   }
@@ -116,8 +168,7 @@ class SimpleGroup implements Group {
   group_move(leader:Creep){
     let current_members = this.all();
     let formation_idx = 0;
-    for (let idx in current_members){
-      let creep = current_members[idx];
+    for (let creep of current_members){
       if (creep == leader)continue;
       let pos_mask = formation[formation_idx++];
 
@@ -127,17 +178,22 @@ class SimpleGroup implements Group {
       if (next_move_pos){
         if (TERRAIN_WALL!=getTerrainAt(next_move_pos)){
           creep.next_move_pos = next_move_pos
+        }else {
+          creep.next_move_pos = this.leader
         }
       }
     }
 
   }
   next_step(target:RoomPosition|null):RoomPosition|null{
-    if (!target)return null;
-    let search_res = searchPath(this.leader!,target);
-    if (search_res.path.length>0){
 
-      return search_res.path[0];
+    if (!target)return null;
+
+    let search_res = findPath(this.leader!,target,{ignore:this.all()});
+
+    if (search_res.length>0){
+
+      return search_res[0];
 
     }else{
       return  null;
@@ -145,7 +201,7 @@ class SimpleGroup implements Group {
   }
 
 }
-const formation =[[1,-1],[1,0],[1,1],[2,-1],[2,0],[2,1]];
+const formation =[[0,-1],[0,1],[-1,-1],[-1,0],[-1,1],[-2,0]];
 
 export const group_plugin = (
 

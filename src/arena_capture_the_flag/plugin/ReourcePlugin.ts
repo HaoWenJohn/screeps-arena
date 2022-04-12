@@ -2,7 +2,8 @@ import { getObjectsByPrototype } from "game/utils";
 import { Flag } from "arena/prototypes";
 import { Creep, StructureTower } from "game/prototypes";
 import { ATTACK, HEAL, RANGED_ATTACK } from "game/constants";
-import { CTX, Plugin } from "..";
+import { CTX } from "../common";
+
 
 export const resource_plugin=function(){
   return {
