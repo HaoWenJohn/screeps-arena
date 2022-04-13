@@ -46,7 +46,7 @@ export const attack_plugin=
       if (ctx.tower){
         if (ctx.nearest_enemy){
 
-          console.log(ctx.nearest_enemy)
+
           console.log(findPath(ctx.tower[0],ctx.nearest_enemy).length)
 
           let path = findPath(ctx.tower[0],ctx.nearest_enemy);

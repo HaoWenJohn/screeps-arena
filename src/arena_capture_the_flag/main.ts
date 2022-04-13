@@ -1,14 +1,17 @@
 import { Creep, RoomPosition, StructureTower } from "game/prototypes";
-import { ErrorMapper } from "../utils/ErrorMapper";
+
 import { combact_plugin } from "./plugin/combact/CombactPlugin";
 
 import { resource_plugin } from "./plugin/ReourcePlugin";
 import { situation_plugin } from "./plugin/SituationPlugin";
 
 import { group_plugin } from "./plugin/GroupPlugin";
-import { DirectionConstant } from "game/constants";
+import { DirectionConstant, TERRAIN_WALL } from "game/constants";
 import { smq } from "./message/MQ";
 import { CTX, Plugin } from "./common";
+import { findPath, getDirection, getTerrainAt } from "game/utils";
+// @ts-ignore
+import { Visual } from "game/visual";
 
 
 
@@ -55,6 +58,13 @@ export const loop= //ErrorMapper.wrapLoop(
         plugin.run(ctx);
       });
     }//)
+
+
+
+
+
+
+
 
 
 
