@@ -27,7 +27,7 @@ export const situation_plugin =
     name: "situation_plugin",
     run(ctx: CTX): void {
 
-      let nearest_enemy = findClosestByPath(ctx.my_flag!, getObjectsByPrototype(Creep).filter(creep => !creep.my));
+      let nearest_enemy = findClosestByPath(ctx.my_flag!, getObjectsByPrototype(Creep).filter(creep => !creep.my),{ignore:ctx.my_creeps});
 
       if (nearest_enemy) {
 
@@ -39,7 +39,7 @@ export const situation_plugin =
         let dis = findPath(ctx.my_flag!, ctx.nearest_enemy).length;
 
         if (dis > 70) {
-          if (getTicks() > 1)
+          if (getTicks() > 1000)
             ctx.situation = Situation.ATTACK;
           else
            ctx.situation = Situation.PICK;

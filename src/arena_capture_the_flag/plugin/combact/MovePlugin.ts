@@ -1,6 +1,7 @@
 import { CTX } from "../../common";
 import { getDirection } from "game/utils";
-
+// @ts-ignore
+import{Visual} from 'game/visual';
 
 export const move_plugin=
    {
@@ -14,9 +15,13 @@ export const move_plugin=
 
       ctx.my_creeps!.filter(creep=>creep.next_move_pos).forEach(creep => {
         if (creep.leader){
+
+
+
           let direction = getDirection(creep.next_move_pos!.x-creep.x,creep.next_move_pos!.y-creep.y);
           creep.move(direction)
         }else{
+
           creep.moveTo(creep.next_move_pos!)
         }
 

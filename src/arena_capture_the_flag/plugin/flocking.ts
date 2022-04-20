@@ -5,35 +5,33 @@ import { findPath, getDirection, getTerrainAt } from "game/utils";
 // @ts-ignore
 import { Visual } from "game/visual";
 import { getObjectsByPrototype ,findInRange} from "game/utils";
-
-import {Flag} from "arena"
 import { Vector } from "../common";
 
 
-
-export function test() {
-  let enemy_flag = getObjectsByPrototype(Flag).filter(f=>!f.my)[0];
-  let my_creeps = getObjectsByPrototype(Creep).filter(c=>c.my);
-
-  let v = new Visual();
+const _COHESIONFORCE = 2.5;
+const _ALIGNMENTFORCE = 0.3;
+const _SEPARATIONFORCE =0;
+const GROUPRANGE = 4;
 
 
-
-
-  my_creeps.forEach(c=>{
-    c.dir =findPath(c,enemy_flag,{ignore:my_creeps})[0];
+export function flocking_move(creeps:Creep[],target:RoomPosition){
+  creeps.forEach(c=>{
+    c.plan_dir =findPath(c,target,{ignore:creeps})[0];
+    c.adjusted_dir = {x:0,y:0}
   });
+  creeps.forEach(c=>{
+    let neighbours = findInRange(c,creeps.filter(s=>s!==c),GROUPRANGE);
 
-  my_creeps.forEach(c=>{
-    let force1 = cohesion(c,findInRange(c,my_creeps.filter(s=>s!==c),2));
-    let force2 = alignment(c,findInRange(c,my_creeps.filter(s=>s!==c),2));
+    let force1 = cohesion(c,neighbours);
+    let force2 = alignment(c,neighbours);
+    let force3 = separation(c,neighbours);
 
-    if (!c.next_dir)c.next_dir={x:0,y:0};
-    c.next_dir.x = c.dir.x-c.x+force1.x+force2.x;
-    c.next_dir.y = c.dir.y-c.y+force1.y+force2.y;
-    let d =c.next_dir;
+    c.adjusted_dir.x = c.plan_dir.x-c.x+force1.x+force2.x+force3.x;
+    c.adjusted_dir.y = c.plan_dir.y-c.y+force1.y+force2.y+force3.y;
+    let d =c.adjusted_dir;
     let next_pos;
     let next_dir = getDirection(d.x,d.y);
+
     switch (next_dir){
       case TOP:
         next_pos = {x:c.x,y:c.y-1};
@@ -58,66 +56,72 @@ export function test() {
       case BOTTOM:
         next_pos = {x:c.x,y:c.y+1};
         break;
-      default:
-        next_pos = c;
-        break;
     }
-    if (next_pos.x<0||next_pos.y>=100||next_pos.y<0||next_pos.y>=100 || getTerrainAt(next_pos)==TERRAIN_WALL)
-      c.move(getDirection(c.dir.x-c.x,c.dir.y-c.y));
-    else
-      c.move(next_dir);
-  })
+    //如果调整的方向出界或者撞墙就按原计划执行
+    if (!next_pos || next_pos.x<0||next_pos.y>=100||next_pos.y<0||next_pos.y>=100 || getTerrainAt(next_pos)==TERRAIN_WALL ){
 
+      c.move(getDirection(c.plan_dir.x-c.x,c.plan_dir.y-c.y));
+    }
+    else{
+      c.move(next_dir);
+    }
+  })
 }
 
 
+
+
 export function norm(v:Vector):Vector{
-  let m = Math.sqrt(v.x * v.x +v.y * v.y);
-  if (m===1)return v;
+  let m =magnitude(v);
+  if (m===1 || m ===0)return v;
   return {
     x:v.x/m,
     y:v.y/m
   }
 }
+export function magnitude(v:Vector):number{
+  return  Math.sqrt(v.x * v.x +v.y * v.y);
+}
 
 
-const _COHESIONFORCE = 0.8;
-const _ALIGNMENTFORCE = 0.7;
 export function cohesion(c:Creep,neighbours:Creep []):Vector{
+  if (neighbours.length==0)return {x:0,y:0};
+
   let pos_sum = neighbours.reduce((pre,cur)=>{
     return {x:pre.x+cur.x,y:pre.y+cur.y}
   },{x:0,y:0});
 
-  //let center = {x:pos_sum.x/neighbours.length,y:pos_sum.y/neighbours.length};
+  let center = {x:pos_sum.x/neighbours.length,y:pos_sum.y/neighbours.length};
 
-  //new Visual().circle(center,{radius:0.3});
 
-  let to_center_vec = norm({x:pos_sum.x/neighbours.length-c.x,y:pos_sum.y/neighbours.length-c.y});
+  let to_center_vec =norm({x:center.x-c.x,y:center.y-c.y});
 
-  let dir = norm(c.dir);
+  let dir = norm(c.plan_dir);
 
   let vec_dot = to_center_vec.x * dir.x +to_center_vec.y * dir.y;
-
-  let impact_rate = Math.acos(vec_dot) / Math.PI;
-
   let m_x= to_center_vec.x>0?1:to_center_vec.x==0?0:-1;
   let m_y= to_center_vec.y>0?1:to_center_vec.y==0?0:-1;
+
+  if (Math.abs(vec_dot)>1)return {x:0,y:0};
+
+  let impact_rate = Math.acos(vec_dot) / Math.PI;
 
   return {x:m_x * impact_rate * _COHESIONFORCE,y:m_y * impact_rate *_COHESIONFORCE}
 }
 
 export function alignment(c:Creep,neighbours:Creep[]):Vector{
+  if (neighbours.length==0)return {x:0,y:0};
 
   let dir_sum = neighbours.reduce((pre,cur)=>{
-    return {x:pre.x+cur.dir.x,y:pre.y+cur.dir.y}
+    return {x:pre.x+cur.plan_dir.x,y:pre.y+cur.plan_dir.y}
   },{x:0,y:0});
 
   let avg_dir = norm({x:dir_sum.x/neighbours.length,y:dir_sum.y/neighbours.length});
 
-  let dir = norm(c.dir);
+  let dir = norm(c.plan_dir);
 
   let vec_dot = avg_dir.x * dir.x +avg_dir.y * dir.y;
-
+  if (Math.abs(vec_dot)>1)return {x:0,y:0};
   let impact_rate = Math.acos(vec_dot) / Math.PI;
 
   let m_x= avg_dir.x>0?1:avg_dir.x==0?0:-1;
@@ -125,4 +129,14 @@ export function alignment(c:Creep,neighbours:Creep[]):Vector{
 
   return {x:m_x * impact_rate * _ALIGNMENTFORCE,y:m_y * impact_rate *_ALIGNMENTFORCE}
 
+}
+
+export function  separation(c:Creep,neighbours:Creep[]):Vector{
+  return neighbours.map(n=>{
+    let force_dir = {x:c.x-n.x,y:c.y-n.y};
+    let mag = magnitude(force_dir);
+    let m_x= force_dir.x>0?1:force_dir.x==0?0:-1;
+    let m_y= force_dir.y>0?1:force_dir.y==0?0:-1;
+    return {x:m_x * _SEPARATIONFORCE /mag,y:m_y * _SEPARATIONFORCE /mag}
+  }).reduce((pre,cur)=>{return {x:pre.x+cur.x,y:pre.y+cur.y}},{x:0,y:0})
 }

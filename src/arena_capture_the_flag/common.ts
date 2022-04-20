@@ -1,4 +1,4 @@
-import { Creep, StructureTower } from "game/prototypes";
+import { Creep, RoomPosition, StructureTower } from "game/prototypes";
 import { Flag } from "arena/prototypes";
 
 export interface Plugin {
@@ -22,3 +22,4 @@ export interface Plugin {
   nearest_enemy: Creep|null,
   tower?: StructureTower[]
 }
+export type Vector = RoomPosition;
