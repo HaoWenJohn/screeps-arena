@@ -8,9 +8,9 @@ import { getObjectsByPrototype ,findInRange} from "game/utils";
 import { Vector } from "../common";
 
 
-const _COHESIONFORCE = 2.5;
+const _COHESIONFORCE = 2;
 const _ALIGNMENTFORCE = 0.3;
-const _SEPARATIONFORCE =0;
+const _SEPARATIONFORCE =0.4;
 const GROUPRANGE = 4;
 
 
