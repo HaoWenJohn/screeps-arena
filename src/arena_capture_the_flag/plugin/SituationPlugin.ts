@@ -34,8 +34,6 @@ export const situation_plugin =
         ctx.nearest_enemy = nearest_enemy;
 
 
-
-
         let dis = findPath(ctx.my_flag!, ctx.nearest_enemy).length;
 
         if (dis > 70) {
