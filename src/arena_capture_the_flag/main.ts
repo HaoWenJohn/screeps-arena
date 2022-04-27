@@ -1,11 +1,19 @@
 import { Creep, RoomPosition, StructureTower } from "game/prototypes";
 
 import { Global_State, Group_State, in_bound, Vector } from "./common";
-import { findClosestByPath, findInRange, getObjectById, getObjectsByPrototype, getRange } from "game/utils";
+import {
+  findClosestByPath,
+  findInRange, getDirection,
+  getObjectById,
+  getObjectsByPrototype,
+  getRange,
+  getTerrainAt
+} from "game/utils";
 import { attackable, healable, ranged_attackable } from "./plugin/combact/common";
 import { BodyPart, Flag } from "arena/prototypes";
 import { CostMatrix, searchPath } from "game/path-finder";
 import { ATTACK, HEAL, RANGED_ATTACK } from "game/constants";
+import { Attacker, Heal, Ra } from "./StateMachine";
 
 
 declare module "game/prototypes" {
@@ -36,11 +44,19 @@ let my_flag:Flag;
 let body_parts:{[key:string]:BodyPart}  ;
 let threaten:number[][];
 let threaten_cost:CostMatrix;
+let next_map:string[][];
+let current_map:string[][];
 function refresh_creeps (){
   my_creeps = getObjectsByPrototype(Creep).filter(c=>c.my);
   enemy_creeps = getObjectsByPrototype(Creep).filter(c=>!c.my);
 }
-
+function refresh_map(){
+  next_map = [...Array(100)].map(e => [...Array(100).fill("")]);
+  current_map = [...Array(100)].map(e => [...Array(100).fill("")]);
+  my_creeps.forEach(c=>{
+    current_map[c.y][c.x] = c.id;
+  })
+}
 function refresh_threaten(){
   threaten = [...Array(100)].map(e => [...Array(100).fill(0)]);
   enemy_creeps.forEach(c=>{
@@ -80,7 +96,19 @@ function refresh_threaten(){
   for (let i=0;i<100;i++){
     for (let j=0;j<100;j++){
       if (threaten[j][i]!=0){
-        threaten_cost.set(i,j,255)
+        let default_cost :number;
+        switch (getTerrainAt({x:i,y:j})) {
+          case 0:
+            default_cost=1;
+            break;
+          case 1:
+            default_cost=255;
+            break;
+          case 2:default_cost=5;
+        }
+        let cost = threaten[j][i] + default_cost
+        if (cost>255)cost=255;
+        threaten_cost.set(i,j,cost)
       }
     }
   }
@@ -103,21 +131,60 @@ export const loop = //ErrorMapper.wrapLoop(
     refresh_creeps();
     refresh_bodyparts();
     refresh_threaten();
+    refresh_map();
     run_group(Global_State.FARM);
+    move();
     ra();
     heal();
 
     attack();
   };
 
+
+function move(){
+  my_creeps.forEach(c=>{
+    if (c.next_move_pos){
+      let pos = c.next_move_pos;
+
+      // @ts-ignore
+      let placeholder:Creep = getObjectById(current_map[pos.y][pos.x]);
+
+      let dir = {x:pos.x-c.x,y:pos.y-c.y}
+      if (placeholder && !placeholder.next_move_pos){
+        placeholder.move(getDirection(-dir.x,-dir.y));
+      }
+      c.move(getDirection(dir.x,dir.y))
+    }
+  })
+}
 function run_global():Global_State{
   return Global_State.FARM
 }
 
 function run_group(global_state:Global_State){
+  my_creeps.forEach(c=>{
+    c.next_move_pos=null;}
+  )
+
   switch (global_state){
     case Global_State.FARM:
-      my_creeps.forEach(c=>run_creep(Group_State.FARM,c))
+      my_creeps.forEach(c=>{
+        if (!c.role){
+          if (c.body.some(b=>b.type=="attack"))c.role = "attack";
+          else if (c.body.some(b=>b.type=="heal"))c.role="heal";
+          else c.role = "ranged_attack";
+        }
+        switch (c.role){
+          case "attack":
+            new Attacker(c,threaten_cost,threaten,enemy_creeps,my_creeps,current_map,next_map).run();
+            break;
+          case "heal":
+            new Heal(c,threaten_cost,threaten,enemy_creeps,my_creeps,current_map,next_map).run();
+            break;
+          case "ranged_attack":
+            new Ra(c,threaten_cost,threaten,enemy_creeps,my_creeps,current_map,next_map).run();
+        }
+      })
       break;
   }
 }
@@ -130,15 +197,20 @@ function run_creep(group_state:Group_State,creep:Creep){
 }
 function free_farm(creep:Creep){
   if (findInRange(creep,enemy_creeps,4).length>0){
-    let closest_enemy = findClosestByPath(creep,enemy_creeps,)
-    if (closest_enemy){
-      let flee_range;
+    let closest_enemys = findInRange(creep,enemy_creeps,4);
+    //let closest_enemy = findClosestByPath(creep,enemy_creeps,)
+    if (closest_enemys.length>0){
+      let flee_range:number;
       if (creep.body.some(b=>b.type==RANGED_ATTACK))
         flee_range=3;
       else if (creep.body.some(b=>b.type==HEAL))
         flee_range=4
       else flee_range =3;
-      let flee_path = searchPath(creep,{pos:closest_enemy,range:flee_range},{flee:true,costMatrix:threaten_cost});
+      let flee_enemys = closest_enemys.map(e=>{
+        return{pos:e,range:flee_range}
+      })
+      //let flee_path = searchPath(creep,{pos:closest_enemy,range:flee_range},{flee:true,costMatrix:threaten_cost});
+      let flee_path =searchPath(creep,flee_enemys,{flee:true,costMatrix:threaten_cost})
       if (flee_path.path.length>0)
         creep.moveTo(flee_path.path[0])
       else creep.moveTo(my_flag)
@@ -202,8 +274,15 @@ function ra() {
     // @ts-ignore
     let ra_target = sorted_ra_targets.find((t) => findInRange(c, [getObjectById(t[0])!], 3).length > 0);
 
-    // @ts-ignore
-    if (ra_target) c.rangedAttack(getObjectById(ra_target[0]));
+
+
+    if (ra_target){
+      // @ts-ignore
+      if (findInRange(c,[getObjectById(ra_target[0])],1).length>0){
+        c.rangedMassAttack();
+        // @ts-ignore
+      }else c.rangedAttack(getObjectById(ra_target[0]));
+    }
   }));
 }
 
